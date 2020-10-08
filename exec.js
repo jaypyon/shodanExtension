@@ -1,5 +1,5 @@
 //정보보호 19-4기 박재용
-//jackypark1220@gmail.com
+//scorpion@dgu.ac.kr
 
 document.querySelector("#send_inputs").addEventListener("click",start_search);
 
