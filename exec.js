@@ -14,87 +14,92 @@ function send(){ //ip목록받아와서 어레이로 리턴해준다.
 	return preprocessed_ips;// 배열로 아이피 정리해서 반환해줌. 이건 추후에 결과를 도출할때와, 주소를 만들때 두가지의 쓰임새가 존재함. 
 }
 async function process(){
-																
 	processing_ips = send(); //IP리스트
 	ip_count = processing_ips.length;
 	base_url = `https://www.shodan.io/search?query=` //근간 URL
-	depicted_url = new Array();
-	final_document="";
-
+	regExp_4=/\<td\>Country\<\/td\>\n<th>([A-Za-z ]{0,})\<\/th\>/;//국가랑씨티
+	regExp_2=/\<td\>City\<\/td\>\n<th>([A-Za-z]{0,})\<\/th\>\n\<\/tr\>\n\<tr\>\n\<td\>Country\<\/td\>\n<th>([A-Za-z]{0,})\<\/th\>/;//국가랑씨티
+	regExp_3=/([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9:]{8})/;//라스트업데이트
+	regExp_1=/CVE-([0-9]{4})-([0-9])+</g;
+	final_document=new String();
+	parsed_time= new  Array();
+	parsed_html = new Array();//문자열로 CVE리스트 순서대로 담아두기
+	parsed_length = new Array();//몇개의 취약점이있는지 출력하기.
+	parsed_Country_City = new Array();
+	depicted_url = new Array(); //완성된 URL 
+	err_index = new Array();
 	for(i=0; i<ip_count;i++){
 		depicted_url.push(base_url+processing_ips[i])
 	}
-													
+	
 	preparsed_html = new Array(); //웹페이지 크롤링 결과 저장
 	
-	CountryAndCity = new Array();
 	
-	for(ipc=0;ipc<ip_count-1;ipc++){
+	
+	for(i=0;i<ip_count-1;i++){
 		
 		//document.querySelector("#initialize_flag").innerHTML = "fetch Count : "+ i+"/"+ip_count
-		await fetch(depicted_url[ipc],{credentials:"include"}).then(function(response){
-			console.log(ipc)
-																
-																
+		await fetch(depicted_url[i],{credentials:"include"}).then(function(response){
 		if(response.ok){
 			
-			
-				final_document+="IP: "+processing_ips[ipc]+"\n"	   
-				response.text().then(function(string_){
-			
-				tempDoc = document.implementation.createHTMLDocument('temp')
-				tempDoc.body.innerHTML=string_;
-				// ip는 querySelectorAll(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > div.page-header > h2`)[0].innerText.split('\n')[0]
-				// 2열의 내용 b.querySelectorAll(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > table > tbody > tr:nth-child(${i}) > th`)[0].innerText
-				//preparsed_html.push(tempDoc);
-				//body > div.container-fluid > div > div.host > div > div:nth-child(1) > div:nth-child(5) > table > tbody > tr:nth-child(1) > th
-				for(j=1;j<8;j++){ 
-					try{
-						CountryOrCityOrUpdated=tempDoc.querySelector(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > table > tbody > tr:nth-child(${j}) > td`).innerText
-						if(CountryOrCityOrUpdated =="City"){
-							final_document += "[City]: "+tempDoc.querySelector(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > table > tbody > tr:nth-child(${j}) > th`).innerText+", "
-						}
-						else if(CountryOrCityOrUpdated =="Country"){
-							final_document += "[Country]: "+tempDoc.querySelector(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > table > tbody > tr:nth-child(${j}) > th`).innerText+"\n"
-						}
-						else if(CountryOrCityOrUpdated =="Last Update"){
-							final_document += "[Last Update]: "+tempDoc.querySelector(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > table > tbody > tr:nth-child(${j}) > th`).innerText+"\n"
-						}
+			err_index.push(0);
+					   
+			response.text().then(function(string_){preparsed_html.push(string_);
 
-					}
-					catch(e){
-						j=8
-					}
 					
-				}
-				final_document+="[취약점 리스트]"+"\n"
-				flag_count = 0;
-				for(j=1;j<1000;j++){ 
-					try{
-						final_document+=tempDoc.querySelector(`body > div.container-fluid > div > div.host > div > div:nth-child(1) > div:nth-child(5) > table > tbody > tr:nth-child(${j}) > th`).innerText+"\n"
-						flag_count = j;
+					prepar_3 = string_.match(regExp_3);	////라스트업데이트 [0] 	
+
+					if(prepar_3!=null){
+						parsed_time.push(prepar_3[0]);
+						try{
+							prepar_2 = string_.match(regExp_2); ///국가시티 [1][2]
+							parsed_Country_City.push(prepar_2[1]+","+prepar_2[2]);}
+						catch(e){
+							prepar_2 = string_.match(regExp_4);
+							parsed_Country_City.push("도시 정보 없음, "+prepar_2[1])
+						}
+						
+						prepar_1 = string_.match(regExp_1);	
+						if(prepar_1!=null){
+							prepar1ength=prepar_1.length;
+							parsed_length.push(prepar1ength);
+							prepar_1 = prepar_1.join("").replace(/</g,"\n")
+							parsed_html.push(prepar_1);
+						}
+						else{prepar_1=""
+							 prepar1ength=0;
+							parsed_html.push(prepar_1);
+							parsed_length.push(0);
+							}
+						final_document = final_document + processing_ips[i-1]+"\n"+"취약점 개수 : "+prepar1ength +"\n"+"국가(도시) : "+prepar_2[1]+","+prepar_2[2]+"\n"+"최근 수정일자 : "+prepar_3[0] +"\n"  +prepar_1 +"\n\n"
 					}
-					catch(e){
-						final_document+="취약점 갯수: "+flag_count+"개"+"\n\n\n"
-						j=1000;						
+					else{
+						parsed_Country_City.push("No information");
+						parsed_time.push("No information");
+						parsed_length.push(0);
+						parsed_html.push("")	
+						final_document = final_document + processing_ips[i-1]+"\n"+"취약점 개수 : "+"-" +"\n"+"국가(도시) : "+"No information" +"\n"+"최근 수정일자 : "+"No information" +"\n"  +"-" +"\n\n"
 					}
 				}
-			}
-			
 			)
 		}
 		else{
-			//preparsed_html.push(-1);
-		final_document+="IP: "+processing_ips[ipc]+" [질의 오류]\n"	   
-		}
+			err_index.push(1);
+			parsed_length.push(-1);
+			parsed_html.push("Status Not OK");
+			preparsed_html.push("ERROR!")
+			parsed_time.push("Status Not OK");
 		
-		document.querySelector("#jb").value =100*(ipc+1)/(ip_count-1);	
+			final_document = final_document + processing_ips[i-1]+"\n"+"취약점 개수 : "+"ERR" +"\n"+"국가(도시) : "+"Status Not OK" +"\n"+"최근 수정일자 : "+"Status Not OK" +"\n"  +"Error" +"\n\n"
+	
+		}
+			
 		})
 
-													
 		
+		document.querySelector("#jb").value =100*(i+1)/(ip_count);
 	}
-			document.querySelector("#jb").value =100;
+			
 		
 		
 	return final_document;
